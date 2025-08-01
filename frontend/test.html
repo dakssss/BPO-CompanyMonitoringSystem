@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Latest PNG Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .container {
+            margin-top: 20px;
+        }
+        #status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
+</head>
+<body>
+    <h1>Open Latest PNG in Directory</h1>
+    
+    <div>
+        <button onclick="openLatestPNG()">Open Latest PNG</button>
+    </div>
+    
+    <div id="status" style="display: none;"></div>
+    
+    <script>
+        // Fixed folder path as a variable
+        let FOLDER_PATH = "/MONITORING%20SYSTEM/backend/screenshots/LE-1F-Station50/";
+        
+        function openLatestPNG() {
+            const statusElement = document.getElementById('status');
+            
+            // Clear previous status
+            statusElement.textContent = '';
+            statusElement.className = '';
+            statusElement.style.display = 'none';
+            
+            showStatus("Accessing directory...", "");
+            
+            // Fetch the directory listing
+            fetch(FOLDER_PATH)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to access directory (${response.status})`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    // Create a DOM parser to parse the HTML response
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Find all links to PNG files
+                    const pngLinks = Array.from(doc.querySelectorAll('a[href$=".png"]'));
+                    
+                    if (pngLinks.length === 0) {
+                        showStatus("No PNG files found in the directory", "error");
+                        return;
+                    }
+                    
+                    // Get dates for each PNG file
+                    const pngFiles = pngLinks.map(link => {
+                        // Get filename
+                        const filename = link.textContent.trim();
+                        
+                        // Find the date in the row (should be in a table cell)
+                        const row = link.closest('tr');
+                        let dateText = '';
+                        if (row) {
+                            const dateCell = row.querySelector('td:nth-child(2)');
+                            if (dateCell) {
+                                dateText = dateCell.textContent.trim();
+                            }
+                        }
+                        
+                        return {
+                            filename: filename,
+                            href: link.getAttribute('href'),
+                            date: new Date(dateText || 0) // Convert to Date object
+                        };
+                    });
+                    
+                    // Sort by date (newest first)
+                    pngFiles.sort((a, b) => b.date - a.date);
+                    
+                    // Get the latest PNG file
+                    const latestPng = pngFiles[0];
+                    
+                    // Create the full URL to the PNG file
+                    const latestPngUrl = new URL(latestPng.href, window.location.origin + FOLDER_PATH).href;
+                    
+                    // Show success message
+                    showStatus(`Opening latest PNG: ${latestPng.filename}`, "success");
+                    
+                    // Open the PNG file in a new tab
+                    window.open(latestPngUrl, "_blank");
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    showStatus(`Error: ${error.message}`, "error");
+                });
+        }
+        
+        function showStatus(message, type) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = type;
+            statusElement.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
